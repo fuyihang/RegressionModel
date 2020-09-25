@@ -19,10 +19,10 @@ y = df[target]
 # 3.训练模型
 # 1）自定义模型
 def yhat(params, *arg):
-    a,b,c = params
+    a,b,c,d = params
     X,y = arg
 
-    ypred = a*X['办公费用'] + b*X['营销费用'] + c
+    ypred = a*X['办公费用'] + b*X['营销费用']**2 + c*X['营销费用'] + d
     return ypred
 
 # 2）自定义损失函数
@@ -36,7 +36,7 @@ def error(params, *arg):
 # 3）最优化参数
 import scipy.optimize as spo
 
-params = [10,200,300]   #初始值
+params = [10, 20, 3, 4]   #初始值
 optResult = spo.minimize(error, params, args=(X, y) )
 # print(optResult)
 
@@ -45,7 +45,7 @@ print(bestParams)
 
 # 4.评估模型
 y_pred = yhat(bestParams, *(X,y))
-print(y_pred)
+# print(y_pred)
 
 mae = np.abs(y - y_pred).mean()
 mape = np.abs( (y-y_pred)/y ).mean()

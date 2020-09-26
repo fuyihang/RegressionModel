@@ -2,9 +2,9 @@
 
 ########  本文件呈现 相关分析 相关知识点，包括：
 #   Part1.简单相关系数: r=sr1.corr(sr2, method)
-#       1)pearson相关
-#       2)spearman相关
-#       3)kendalltau相关
+#       1)pearson相关       (method='pearson')
+#       2)spearman相关      (method='spearman')
+#       3)kendalltau相关    (method='kendall')
 #   Part2.相关系数矩阵: dfcorr = df.corr(method)
 #   Part3.相关系数及显著性:
 #       1)scipy.stats.pearsonr
@@ -55,7 +55,7 @@ print('腰围和体重的相关系数r=', r)
 # 一次性实现多个变量间的相关系数
 
 # 计算相关系数矩阵
-dfcorr = df.corr()  #默认 method='pearson'
+dfcorr = df.corr()  #默认 method='pearson','spearman','kendall'
 print(dfcorr)
 
 r = dfcorr.loc['腰围', '体重']

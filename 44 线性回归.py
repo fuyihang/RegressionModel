@@ -65,7 +65,6 @@ def displayRegressionMetrics(y_true, y_pred, adjVal=None):
     # resid = y_true - y_pred         #残差
     # z,p = stats.normaltest(resid)   #正态检验
     
-    # return mts
     return
 
 
@@ -530,6 +529,12 @@ print('cols=', df.columns.tolist())
 cols = ['失业率', '人均GNP', '教育开支']
 target = '人均销售额'
 
+# 属性选择
+dfcorr = df.corr(method='spearman')
+cond = np.abs(dfcorr[target]) > 0.3
+cols = dfcorr[cond].index.tolist()
+cols.remove(target)
+
 X = df[cols]
 y = df[target]
 
@@ -546,11 +551,12 @@ srPred = pd.Series( y - y_pred, index=df.index, name='误差')
 df2 = pd.concat([df, srPred], axis=1)
 print(df2)
 
-# 5、优化一
+# 5、优化一：去除离群值
+
 # 查找预测离群值
 resid = y - y_pred
 std = np.std(resid)
-cond = np.abs(resid) > 2*std
+cond = np.abs(resid) > 3*std
 dfOutlier = df[cond]
 print('预测离群值：\n',dfOutlier)
 
@@ -581,6 +587,12 @@ print('cols=', df.columns.tolist())
 cols = ['价格', '广告费用']
 target = '销量'
 
+# 属性选择
+dfcorr = df.corr(method='spearman')
+cond = np.abs(dfcorr[target]) > 0.3
+cols = dfcorr[cond].index.tolist()
+cols.remove(target)
+
 X = df[cols]
 y = df[target]
 
@@ -596,9 +608,8 @@ displayRegressionMetrics(y, y_pred, X.shape)
 # 5、优化二：新增非线性检验
 df['价格*2'] = df['价格']**2
 df['广告*2'] = df['广告费用']**2
-
-cols = ['价格', '广告费用', '价格*2', '广告*2']
-target = '销量'
+cols = df.columns.tolist()
+cols.remove(target)
 
 X = df[cols]
 y = df[target]
@@ -613,9 +624,8 @@ displayRegressionMetrics(y, y_pred, X.shape)
 # 6、优化三：新增相互作用
 
 df['价格*广告'] = df['价格'] * df['广告费用']
-
-cols = ['价格', '广告费用', '价格*2', '广告*2','价格*广告']
-target = '销量'
+cols = df.columns.tolist()
+cols.remove(target)
 
 X = df[cols]
 y = df[target]
@@ -641,6 +651,13 @@ cols = ['身高', '年龄']
 target = '体重'
 
 # 2、数据处理
+
+# 属性选择
+dfcorr = df.corr(method='spearman')
+cond = np.abs(dfcorr[target]) > 0.3
+cols = dfcorr[cond].index.tolist()
+cols.remove(target)
+
 X = df[cols]
 y = df[target]
 
@@ -660,6 +677,7 @@ po = PolynomialFeatures(degree=n, include_bias=False)
 fit_X = po.fit_transform(X)
 print(fit_X.shape)
 
+
 # 3.训练模型
 mdl = LinearRegression()
 mdl.fit(fit_X, y)
@@ -677,14 +695,13 @@ displayRegressionMetrics(y, y_pred, fit_X.shape)
 plot_learning_curve(mdl, fit_X, y)
 
 
-# 6.应用模型（略）
+# 6.应用模型
+x = [[151, 12]]  #新数据集
 
-x = [[151, 12]]  #新数据
-
-# 进行多项式转换
+# 注：要先进行多项式转换
 fit_X = po.transform(x)
-
-pred = mdl.predict(fit_X) #利用模型预测
+# 再利用模型预测
+pred = mdl.predict(fit_X) 
 print(pred)
 
 
@@ -733,7 +750,7 @@ print(np.corrcoef(fit_X))
 # ###########优化一，采用Ridge回归##########
 from sklearn.linear_model import Ridge 
 
-alpha = 5
+alpha = 5.0
 mdl = Ridge(alpha=alpha) #cholesky
 mdl.fit(fit_X, y)
 
@@ -748,7 +765,7 @@ print('Ridge回归系数：\n',sr)
 y_pred = mdl.predict(fit_X)
 displayRegressionMetrics(y_pred, y, fit_X.shape)
 # R2变小，系数也相对小
-
+# alpha越大，R2越小，系数也在收缩越小
 
 # 超参优化（略）
 
@@ -769,12 +786,11 @@ y_pred = mdl.predict(fit_X)
 displayRegressionMetrics(y_pred, y, fit_X.shape)
 # 回归系数，多数为0
 
-
 # ###########优化三，采用ElasticNet回归##########
 from sklearn.linear_model import ElasticNet
 
-alpha = 0.01
-l1_ratio = 0.5
+alpha = 3
+l1_ratio = 0.9
 
 mdl = ElasticNet(alpha=alpha, l1_ratio= l1_ratio)
 mdl.fit(fit_X, y)
@@ -830,11 +846,11 @@ scores = []
 Params = []
 
 mdl = Ridge()
-alphas = np.linspace(0.01, 10, 100)     #0.01~10之间取100个值
+alphas = np.linspace(0.01, 1, 100)     #0.01~10之间取100个值
 for a in alphas:
     mdl.set_params(alpha=a)
     r2s = cross_val_score(mdl, X, y, cv=5, scoring='r2')
-    print(r2s)
+    # print(r2s)
     scores.append(r2s.mean()) 
     Params.append(a)
 # print(scores)

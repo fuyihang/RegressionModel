@@ -2,13 +2,10 @@
 
 ########  本文件呈现 方差分析 相关知识点，包括：
 # Part1.单因素方差分析(scipy.stats)
-#   1)齐性检验
-#   scipy.stats.levene()    齐性检验p>0.05
-#   2）方差分析
-#   scipy.stats.f_oneway()  方差分析p<0.05
-#       F统计量、p显著性
+#   1)齐性检验scipy.stats.levene()    assert(p>0.05)
+#   2)方差分析scipy.stats.f_oneway()  assert(p<0.05)
 
-# Part2.单因素/多因素方差分析(statsmodels.stats.anova)
+# Part2.单因素/多因素方差分析
 # Part3.协方差分析
 #   from statsmodels.formula.api import ols
 #   from statsmodels.stats.anova import anova_lm
@@ -43,9 +40,10 @@ target = '月销量'
 # 分组
 grouped = df.groupby(by=col)
 groups = []
-vals = df[col].unique()
+
 for name, grp in grouped:
     groups.append(grp[target])
+# vals = df[col].unique()
 # for val in vals:
 #     groups.append(grouped.get_group(val)[target])
 
@@ -71,19 +69,20 @@ else:
     print('因子={},因变量={}，没有有显著影响！'.format(col, target))
 
 
-#### 3、作描述分析(因素的最佳水平)
+#### 3、因素的最佳水平
 # grouped = df.groupby(by='位置')
-dfstastic = grouped[target].agg([np.size, np.sum, np.mean])
+sr = grouped[target].mean()
+idxmax = np.argmax(sr.values)
+idxmin = np.argmin(sr.values)
+print('最佳因素:argmax={},argmin={}'.format(sr.index[idxmax],sr.index[idxmin]))
 
-dfstastic.columns = ['计数','求和','平均值']
-print(dfstastic)
+# dfstastic = grouped[target].agg([np.size, np.sum, np.mean])
+# dfstastic.columns = ['计数','求和','平均值']
+# print(dfstastic)
 
 #### 4、可视化
 sr = grouped[target].mean()
-plt.bar(sr.index, sr.values)
-plt.ylabel(target)
-plt.title('平均销量')
-plt.show()
+sr.plot(kind='bar',title='平均销量')
 
 # 最后，结论：
 # 1）位置对销量有显著影响
@@ -112,15 +111,14 @@ import statsmodels.stats.anova as smsa
 # formula = '销量~广告形式+地区'    #多因素（主效应）
 # formula = '销量~广告形式*地区'    #多因素（主效应+交互项）
 
-formula = '{} ~ '.format(target)
-formula += '*'.join(catCols)
-
+formula = '{} ~ {}'.format(
+            target,
+            '*'.join(catCols)
+            )
 module = smf.ols(formula, df).fit()
 # print(module.summary())
 
 print('方程R2={:.4}, adjR2={:.4}'.format(module.rsquared, module.rsquared_adj))
-if module.rsquared_adj < 0.7:
-    print('可能还存在其它影响因素！')
 
 dfRet = smsa.anova_lm(module)  #返回DF对象
 print(dfRet)
@@ -140,23 +138,16 @@ for col in cols:
     sr = groups[target].mean()
     print(sr)
     # 取最大值/最小值对应的最佳水平
-    print('col={}, MAX={}[{:.4}], MIN={}[{:.4}]\n'.format(byCols, 
+    print('col={}, MAX={}[{:.4}], MIN={}[{:.4}]\n'.format(
+                    byCols, 
                     sr.idxmax(), sr.max(),
                     sr.idxmin(), sr.min() )
                     )
 
-    # 画图（仅主效应）
-    if len(byCols) == 1:
-        plt.bar(sr.index, sr.values, 
-                align='center', 
-                # color=['g','b'], 
-                edgecolor='k', linewidth=1)
-        
-        plt.title('柱状图')
-        plt.xlabel(col)
-        plt.ylabel(target)
-        plt.title('平均值')
-        plt.show()
+    # 画图
+    sr.plot(kind='bar',title='平均销量')
+    plt.show()
+
 
 # 5、多重比较
 # 广告形式的多重组合是否会对销售额有显著的差异
@@ -174,9 +165,7 @@ formula += '+'.join(catCols)
 module = smf.ols(formula, df).fit()
 dfRet = smsa.anova_lm(module)  #返回DF对象
 print(dfRet)
-if module.rsquared_adj < 0.7:
-    print('可能还存在其它影响因素！')
-
+print(module.rsquared_adj)
 
 ######################################################################
 ########  封装函数：多因素方差分析:statsmodels.stats.anova模块
@@ -187,42 +176,27 @@ import statsmodels.formula.api as smf
 import statsmodels.stats.anova as smsa
 
 def catFeatureSelection(df, catCols, target, threshold=0.05):
-    # 先做主效应和交互项检验
-    formula = '{} ~ '.format(target)
-    formula += '*'.join(catCols)
+    # 先做主效应检验
+    formula = '{} ~ {}'.format(target, '+'.join(catCols))
 
     module = smf.ols(formula, df).fit()
-    dfRet = smsa.anova_lm(module)  #返回DF对象
-    # print(dfRet)
+    dfRet = smsa.anova_lm(module)
 
     # 取显著因子项
     cond = dfRet['PR(>F)'] < threshold
-    sr = dfRet[cond]
-    cols = list(sr.index)
+    cols = dfRet[cond].index.tolist()
 
-    # 优化：非饱和模型, 减1表示要去除残差项
-    while len(cols) < len(dfRet)-1:  #相当于存在非显著因子
-        formula = '{} ~ '.format(target)
-        formula += '+'.join(cols)
+    # 再做主效应和交互作用检验
+    formula = '{} ~ {}'.format(target, '*'.join(catCols))
 
-        module = smf.ols(formula, df).fit()
-        dfRet = smsa.anova_lm(module)
+    module = smf.ols(formula, df).fit()
+    dfRet = smsa.anova_lm(module)
 
-        # 取显著因子项
-        cond = dfRet['PR(>F)'] < threshold
-        sr = dfRet[cond]
-        cols = list(sr.index)
-    else:
-        print(dfRet)
-        print('\n显著影响因子：',cols)
-        if len(cols) > 1:
-            r2 = module.rsquared_adj    #多元用调整R2
-        else:
-            r2 = module.rsquared        #一元用简单R2
-        if r2 < 0.7:
-            print('可能还存在其它影响因素！r2={:.4}\n'.format(r2))
-    
-    # 找出最佳水平（仅主效应）
+    # 取显著因子项
+    cond = dfRet['PR(>F)'] < threshold
+    cols = dfRet[cond].index.tolist()
+
+    # 找出最佳水平
     for col in cols:
         # 统计
         byCols = col.split(':')
@@ -235,16 +209,9 @@ def catFeatureSelection(df, catCols, target, threshold=0.05):
                         sr.idxmin(), sr.min() )
                         )
         
-        # 主效应可视化
-        if col.find(':') == -1:   #组合暂不考虑
-            grouped = df.groupby(col)
-            sr = grouped[target].mean()
-            # print(sr)
-            plt.bar(range(len(sr)), sr.values, tick_label=sr.index)
-            plt.xlabel(col)
-            plt.ylabel(target)
-            plt.title('平均值')
-            plt.show()
+        # 可视化
+        sr.plot(kind='bar', title='平均值')
+        plt.show()
 
     return cols
 
@@ -275,41 +242,39 @@ cols = catFeatureSelection(dfTel, catCols, target)
 
 # 特征筛选函数
 def featureSelection(df, catCols, intCols, target, threshold=0.05):
-    # 先做全因子检验
+    # 先做主效应检验
     formula = target + ' ~ ' + \
-                '*'.join(intCols) + '+' + \
-                '*'.join(catCols)                
+                '+'.join(intCols) + '+' + \
+                '+'.join(catCols)                
 
     module = smf.ols(formula, df).fit()
     dfRet = smsa.anova_lm(module)
 
     # 取显著因子项
     cond = dfRet['PR(>F)'] < threshold
-    sr = dfRet[cond]
-    cols = list(sr.index)
+    cols = dfRet[cond].index.tolist()
 
-    # 优化：非饱和模型
-    while len(cols) < len(dfRet)-1:  #相当于存在非显著因子
-        formula = '{} ~ '.format(target)
-        formula += '+'.join(cols)
+    # 对显著因子，再做主效应及交互项
+    for col in catCols:
+        if col not in cols:
+            catCols.remove(col)
+    for col in intCols:
+        if col not in cols:
+            intCols.remove(col)
+    
+    formula = '{} ~ {}+{}'.format(
+                target,
+                '*'.join(intCols),
+                '*'.join(catCols) )
 
-        module = smf.ols(formula, df).fit()
-        dfRet = smsa.anova_lm(module)
+    module = smf.ols(formula, df).fit()
+    dfRet = smsa.anova_lm(module)
 
-        # 取显著因子项
-        cond = dfRet['PR(>F)'] < threshold
-        sr = dfRet[cond]
-        cols = list(sr.index)
-    else:
-        print(dfRet)
-        print('\n显著影响因子：',cols)
-        if len(cols) > 1:
-            r2 = module.rsquared_adj    #多元用调整R2
-        else:
-            r2 = module.rsquared        #一元用简单R2
-        if r2 < 0.7:
-            print('可能还存在其它影响因素！r2={:.4}'.format(r2))
-
+    # 取显著因子项
+    cond = dfRet['PR(>F)'] < threshold
+    cols = dfRet[cond].index.tolist()
+    print('\n显著影响因子：',cols)
+    
     # 因素的最佳水平
     for col in cols:
         # 统计
@@ -326,23 +291,17 @@ def featureSelection(df, catCols, intCols, target, threshold=0.05):
                         )
         
         # 主效应可视化
-        if col.find(':') == -1:   #不考虑交互项
-            grouped = df.groupby(col)
-            sr = grouped[target].mean()
-            plt.bar(sr.index, sr.values)
-            plt.xlabel(col)
-            plt.ylabel(target)
-            plt.title('平均值')
-            plt.show()
+        sr.plot(kind='bar', title='平均值')
+        plt.show()
 
     return cols
 
 # 1、读取数据集
 filename = 'Telephone.csv'
 df = pd.read_csv(filename, encoding='gbk')
-print(df.columns.tolist())
+# print(df.columns.tolist())
 
-catCols = ['居住地', '婚姻状况', '教育水平', '性别']
+catCols = ['居住地', '婚姻状况', '教育水平', '性别','电子支付']
 intCols = ['年龄', '收入','家庭人数','开通月数']
 target = '消费金额'
 

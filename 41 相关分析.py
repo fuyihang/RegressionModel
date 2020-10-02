@@ -26,7 +26,6 @@ import matplotlib.pyplot as plt
 
 from scipy import stats
 
-
 # 1、读取数据集
 filename = '相关性分析.xls'
 sheetname = '腰围与体重'

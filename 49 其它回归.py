@@ -3,65 +3,20 @@
 
 ########  本文件实现其它回归模型，包括
 # Part1、线性回归：statsmodels.api
-# Part2、模型优化：非饱和模型，及自动筛选自变量
-# Part3、随机梯度下降回归
+# Part2、模型自动筛选自变量
+
 # Part4、决策回归树(CART回归树)
 # Part5、神经网络回归(ANN-MLP)
 # Part6、支持向量回归(SVR)
-# Part7、
+
 ######################################################################
 
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-
-from sklearn import metrics
-def displayRegressionMetrics(y_true, y_pred, adjVal=None):
-    '''
-    \n功能：计算回归的各种评估指标。
-    \n参数：y_true:真实值
-         y_pred:预测值
-         adjVal:输入的shape参数(n,p)，其中n是样本量，p是特征数
-            默认None表示是一元回归；
-    \n返回：各种指标，字典形式
-    '''
-    # 评估指标：R^2/adjR^2, MAPE, MAE，RMSE
-    mts = {}
-    #一元回归，计算R^2；
-    mts['R2'] = metrics.r2_score(y_true, y_pred)
-    # 多元回归，计算调整R^2
-    if (adjVal != None) and (adjVal[1] > 1):
-        n, p = adjVal
-        mts['adjR2']  = 1-(1-mts['R2'])*(n-1)/(n-p-1)
-
-    mts['MAPE'] = (abs((y_pred-y_true)/y_true)).mean()
-    mts['MAE'] = metrics.mean_absolute_error(y_true, y_pred)
-    MSE = metrics.mean_squared_error(y_true, y_pred)
-    mts['RMSE'] = np.sqrt(MSE)
-    
-    # 格式化，保留小数点后4位
-    for k,v in mts.items():
-        mts[k] = np.round(v, 4)
-    
-    # 特别处理,注意变成了字符串
-    mts['MAPE'] = '{0:.2%}'.format(mts['MAPE']) 
-
-    print('回归模型评估指标：\n', mts)
-    # 也可以手工计算
-    # ssr = ((y_pred-y_true.mean())**2).sum()
-    # sst = ((y_true-y_true.mean())**2).sum()
-    # mts['R2'] = ssr/sst
-    # mts['adjR2'] = 1- ((sst-ssr)/(n-p-1))/(sst/(n-1))
-    # mts['MAE'] = (abs(y_pred-y_true)).mean()
-    # mts['RMSE'] = np.sqrt(((y_pred-y_true)**2).mean())
-
-    # # 残差检验：均值为0，正态分布，随机无自相关
-    # resid = y_true - y_pred         #残差
-    # z,p = stats.normaltest(resid)   #正态检验
-    
-    # return mts
-    return
+from common import displayRegressionMetrics
+from common import featureSelection
 
 
 ######################################################################
@@ -71,21 +26,20 @@ def displayRegressionMetrics(y_true, y_pred, adjVal=None):
 # 1、读取数据
 filename = 'Telephone.csv'
 df = pd.read_csv(filename, encoding='gbk')
-print(df.columns.tolist())
+# print(df.columns.tolist())
 
 # 2、特征工程
-# 1）特征标识/人为筛选
 intCols = ['年龄','收入', '家庭人数', '开通月数','电子支付']
 catCols = ['居住地', '婚姻状况', '教育水平', '性别']
+cols = intCols + catCols
 
 target = '消费金额'
+y = df[target]
 
 # 3、训练模型
 import statsmodels.formula.api as smf
 
-cols = intCols + catCols
-formula = '{} ~ '.format(target)
-formula += '+'.join(cols)
+formula = '{} ~ {}'.format(target, '+'.join(cols))
 
 module = smf.ols(formula, df)
 results = module.fit()
@@ -103,11 +57,12 @@ if results.f_pvalue < 0.05:     #方程显著性
 # 2）回归系数的显著性检验：自变量与因变量是否有显著影响
 # print(results.tvalues)
 sr = results.pvalues    #查看所有回归系数的显著性，Series
-print(sr)
+# print(sr)
 
 sr.drop('Intercept', inplace=True)
-sr2 = sr[sr<0.05]
-print('显著影响因子：', sr2.index.tolist() )
+cond = sr < 0.05
+cols = sr[cond].index.tolist()
+print('显著影响因子：', cols )
 
 # 3）模型评估指标（拟合程度）
 # 拟合程度（越接近于1表示模型越好）
@@ -116,7 +71,6 @@ print('R2={:.4}, adjR2={:.4}'.format(results.rsquared, results.rsquared_adj))
 # 信息准则指标(带惩罚项，越小表示模型越好)
 print('AIC={}, BIC={}'.format(results.aic, results.bic))    #信息准则指标
 
-y = df[target]
 y_pred = results.fittedvalues
 displayRegressionMetrics(y, y_pred)
 
@@ -129,78 +83,35 @@ displayRegressionMetrics(y, y_pred)
 # 5、模型优化
 
 # 6、应用模型
-# 1）预测
-y_pred = results.fittedvalues   #旧数据
+# 1）预测历史数据
+y_pred = results.fittedvalues
 
-XX = df.loc[10:11,:]    #新数据
+# 2）预测新数据
+XX = df.loc[10:11,:]
 pred = results.predict(XX)
 print(pred)
 
-# 2）保存模型
-file = 'out.mdl'
-results.save(file, remove_data=True)
+# 3）保存模型
+fname = 'out.mdl'
+results.save(fname, remove_data=True)
 # remove_data表示移除预测数值fittedvalues等，默认为False要保存
 # 我认为没有必要，所以此处设置为True
 
-# 3)加载模型
+# 4)加载模型
 from statsmodels.regression.linear_model import RegressionResults
 
-file = 'out.mdl'
-results = RegressionResults.load(file)
+fname = 'out.mdl'
+results = RegressionResults.load(fname)
 
-# 接下来可同前使用
+# 5）预测新数据(略)
 print(results.params)
 
 
+
 ######################################################################
-########  Part2、模型优化：非饱和模型自动筛选自变量
+########  Part2、模型自动筛选自变量
 ######################################################################
-# 模型优化一：非饱和模型
-
-# 1)筛选出显著因子
-import statsmodels.stats.anova as smsa
-
-dfRet = smsa.anova_lm(results)  #返回DF对象
-
-threshold = 0.05
-cond = dfRet['PR(>F)'] < threshold
-sr = dfRet[cond]
-cols = sr.index.tolist()
-print('显著因子：', cols)
-
-# 2）第一次优化：饱和模型
-for col in intCols:
-    if col not in cols:
-        intCols.remove(col)
-for col in catCols:
-    if col not in cols:
-        catCols.remove(col)
-
-formula = '{} ~ '.format(target)
-formula += '*'.join(intCols) + '+' +\
-            '*'.join(catCols)
-module = smf.ols(formula, df)
-results = module.fit()
-
-dfRet = smsa.anova_lm(results)
-print(dfRet)
-
-# 第二次优化：非饱和模型
-cond = dfRet['PR(>F)'] < threshold
-sr = dfRet[cond]
-cols = sr.index.tolist()
-
-formula = '{} ~ '.format(target)
-formula += '+'.join(cols)
-module = smf.ols(formula, df)
-results = module.fit()
-
-print(results.params)
-# 模型评估同前
-
-
-# 模型优化二：自动筛选自变量
-# 当存在多个自变量时，如何判断使用哪些自变量建模？
+# 当加入变量时，模型质量变化不大，则说明此变量不用进入模型
 
 cols = intCols + catCols
 
@@ -211,8 +122,8 @@ for k in range(len(cols)):
     for var in itertools.combinations(cols, k+1):
         varCols = list(var)
 
-        formula = '{} ~ '.format(target)
-        formula += '+'.join(varCols)
+        formula = '{} ~ {}'.format(target,
+                    '+'.join(varCols) )
         # print(formula, varCols)
         mdl = smf.ols(formula, df[[target]+varCols])
         results = mdl.fit()
@@ -224,8 +135,7 @@ cols = min(AICs, key=AICs.get)
 cols = list(cols)
 
 # 然后，再利用这些字段建模
-formula = '{} ~ '.format(target)
-formula += '+'.join(cols)
+formula = '{} ~ {}'.format(target, '+'.join(cols))
 
 mdl = smf.ols(formula, df)
 results = mdl.fit()
@@ -234,113 +144,9 @@ print(results.params)       #回归系数，包括常量
 # 其他略
 
 ######################################################################
-########  Part3、随机梯度下降回归
-######################################################################
-
-# 1.读取数据
-filename = '回归分析.xlsx'
-sheet = '身高年龄与体重'
-df = pd.read_excel(filename, sheet_name=sheet)
-print('cols=', df.columns.tolist())
-cols = ['身高', '年龄']
-target = '体重'
-
-# 2、数据处理
-X = df[cols]
-y = df[target]
-
-# 3、训练模型
-from sklearn.linear_model import SGDRegressor
-
-mdl = SGDRegressor(penalty=None, max_iter=10000)
-mdl.fit(X, y)
-
-sr = pd.Series(
-        data = [mdl.intercept_[0]] + mdl.coef_.tolist(),       #奇怪：mdl.intercept_返回的是一个数组
-        index= ['常数'] + cols
-)
-sr.name = '随机梯度-回归系数'
-print(sr)
-
-# 4、评估
-y_pred = mdl.predict(X)
-displayRegressionMetrics(y, y_pred, X.shape)
-
-# 6、应用模型
-XX = [[170, 32]]
-pred = mdl.predict(XX)
-print(pred)
-
-# 5、超参优化
-params = [{'loss':['squared_loss', 'huber', 'epsilon_insensitive','squared_epsilon_insensitive'],
-            'penalty':['l2', 'l1'],
-            'alpha':np.linspace(0, 10, 50),         #l1,l2时仅使用alpha超参            
-            'max_iter':[5000, 10000, 50000],
-            # 'learning_rate':['constant','optimal','invscaling','adaptive']
-        },
-        {'loss':['squared_loss', 'huber', 'epsilon_insensitive','squared_epsilon_insensitive'],
-            'penalty':['elasticnet'],
-            'l1_ratio':np.linspace(0, 1, 20),       #范围[0,1],仅用于elasticnet惩罚项
-            'max_iter':[1000, 5000, 10000],
-        }]
-
-mdl = SGDRegressor(random_state=10,learning_rate='adaptive')    #固定的参数在初始化类时确定
-
-from sklearn.model_selection import GridSearchCV
-grid = GridSearchCV(mdl, params, cv=5, scoring=None)
-grid.fit(X, y)
-
-print('最优超参：', grid.best_params_)
-print('最优得分：',grid.best_score_)
-
-mdl = grid.best_estimator_  #后续可以保存最优模型并使用
-y_pred = mdl.predict(X)
-displayRegressionMetrics(y, y_pred, X.shape)
-
-# SGDRegressor类
-    # SGDRegressor(loss='squared_loss', penalty='l2', 
-    #           alpha=0.0001, l1_ratio=0.15, fit_intercept=True, 
-    #           max_iter=1000, tol=0.001, shuffle=True, verbose=0, 
-    #           epsilon=DEFAULT_EPSILON, random_state=None, 
-    #           learning_rate='invscaling', eta0=0.01, power_t=0.25, 
-    #           early_stopping=False, validation_fraction=0.1, 
-    #           n_iter_no_change=5, warm_start=False, average=False)
-    # SGDRegressor 非常适用于有大量训练样本（>10,000)的回归问题，
-    # 对于其他问题，推荐使用 Ridge ，Lasso ，或 ElasticNet 。
-
-    # SGDRegressor 支持以下的损失函数:
-        # loss=”squared_loss”: Ordinary least squares（普通最小二乘法）,
-        # loss=”huber”: Huber loss for robust regression（Huber回归）,
-        # loss=”epsilon_insensitive”: linear Support Vector Regression（线性支持向量回归）.
-    # Huber 和 epsilon-insensitive 损失函数可用于 robust regression（鲁棒回归）。
-    # 不敏感区域的宽度必须通过参数 epsilon 来设定。这个参数取决于目标变量的规模。
-    # SGDRegressor 支持 ASGD（平均随机梯度下降） 作为 SGDClassifier。均值化可以通过设置 average=True 来启用。
-
-    # SGDRegressor 对于利用了 squared loss（平方损失）和 l2 penalty（l2惩罚）的回归，
-    # 在 Ridge 中提供了另一个采取 averaging strategy（平均策略）的 SGD 变体，其使用了随机平均梯度 (SAG) 算法。
-
-#SGDClassifier类
-    #SGDClassifier 支持以下的 loss functions（损失函数）：
-        # loss=”hinge”: (soft-margin) linear Support Vector Machine （（软-间隔）线性支持向量机），
-        # loss=”modified_huber”: smoothed hinge loss （平滑的 hinge 损失），
-        # loss=”log”: logistic regression （logistic 回归），
-        # and all regression losses below（以及所有的回归损失）。
-
-    # SGDClassifier 支持以下 penalties（惩罚）:
-        # penalty=”l2”: L2 norm penalty on coef_.（默认）
-        # penalty=”l1”: L1 norm penalty on coef_.
-        # penalty=”elasticnet”: Convex combination of L2 and L1（L2 型和 L1 型的凸组合）; 
-        #           (1 - l1_ratio) * L2 + l1_ratio * L1.
-    # L1 penalty （惩罚）导致稀疏解，使得大多数系数为零。 
-    # Elastic Net（弹性网）解决了在特征高相关时 L1 penalty（惩罚）的一些不足。
-    # 参数 l1_ratio 控制了 L1 和 L2 penalty（惩罚）的 convex combination （凸组合）。
-
-######################################################################
 ########  Part4、决策回归树(CART回归树)
 ######################################################################
 # 决策树用于回归问题
-
-from sklearn.tree import DecisionTreeRegressor
 
 # 1、读取数据
 filename = 'Telephone.csv'
@@ -366,19 +172,20 @@ X = np.concatenate([X_cats, df[intCols]], axis=1)
 cols = catCols + intCols
 
 # 3、建模
+from sklearn.tree import DecisionTreeRegressor
+
 mdl = DecisionTreeRegressor(random_state = 10)
 mdl.fit(X, y)
 
 # 显示特征重要性
 sr = pd.Series(mdl.feature_importances_, index = cols, name='决策树')
 sr.sort_values(ascending=False, inplace=True)
-plt.bar(range(len(sr)), sr.values, tick_label=sr.index)
-plt.show()
+sr.plot(kind='bar', title='特征重要性')
+# plt.show()
 
 # 4、评估
 y_pred = mdl.predict(X)
 displayRegressionMetrics(y, y_pred, X.shape)
-
 
 # 5、超参优化
 from sklearn.model_selection import GridSearchCV
@@ -398,7 +205,7 @@ print("最优模型得分：",grid.best_score_)
 print("最优超参：",grid.best_params_)
 
 # 可保存最优超参，及最优模型，以便后续使用
-best_depth = grid.best_params_['max_depth']
+bestParams = grid.best_params_
 mdl = grid.best_estimator_
 
 y_pred = mdl.predict(X)
@@ -408,13 +215,7 @@ displayRegressionMetrics(y, y_pred, X.shape)
 # 保存决策树
 # 决策树解决
 # 保存模型
-import joblib
-file = 'out.mdl'
-joblib.dump(mdl, file)
 
-# 加载模型
-file = 'out.mdl'
-mdl = joblib.load(file)
 
 # DecisionTreeClassifier(
     # ccp_alpha=0.0, class_weight=None, criterion='gini',
@@ -491,8 +292,6 @@ mdl = joblib.load(file)
 ######################################################################
 # 神经网络用于回归问题
 
-from sklearn.tree import DecisionTreeRegressor
-
 # 1、读取数据
 filename = 'Telephone.csv'
 df = pd.read_csv(filename, encoding='gbk')
@@ -522,7 +321,6 @@ from sklearn.preprocessing import StandardScaler
 enc = StandardScaler()
 X_ints = enc.fit_transform(df[intCols])
 
-
 # 3）合并
 X = np.concatenate([X_cats, X_ints], axis=1)
 cols = TmpCols + intCols
@@ -534,7 +332,6 @@ from sklearn.neural_network import MLPRegressor
 mdl = MLPRegressor(random_state = 10, 
         hidden_layer_sizes=(50, 25, 10))
 mdl.fit(X, y)
-
 
 # 4、评估
 y_pred = mdl.predict(X)
@@ -553,15 +350,12 @@ mdl = MLPRegressor()
 grid = GridSearchCV(estimator=mdl, param_grid=params, cv=5)
 grid.fit(X, y)
 
-print("最优模型得分：",grid.best_score_)
-print("最优超参：",grid.best_params_)
-
-# 可保存最优超参，及最优模型，以便后续使用
+# 保存
+bestParams = grid.best_params_
 mdl = grid.best_estimator_
 
 y_pred = mdl.predict(X)
 displayRegressionMetrics(y, y_pred, X.shape)
-
 
 # 输出神经网络的详细信息：
 print('总共层数：', mdl.n_layers_)
@@ -597,9 +391,10 @@ print('\t激活函数=', mdl.out_activation_)
 ######################################################################
 # 支持向量用于回归问题
 
+# 数据集处理同上（略）
 
 # 3、训练模型
-from sklearn.svm import SVR, NuSVR, LinearSVR
+from sklearn.svm import SVR
 
 mdl = SVR(kernel='rbf', C=1.0)
 mdl.fit(X, y)
@@ -624,9 +419,7 @@ params = [{'kernel':['rbf','sigmoid'],
 grid = GridSearchCV(mdl, param_grid=params, cv=5)
 grid.fit(X, y)
 
-print('best param:', grid.best_params_)
-print('best score:', grid.best_score_)
-
+bestParams = grid.best_params_
 mdl = grid.best_estimator_
 
 # 预测

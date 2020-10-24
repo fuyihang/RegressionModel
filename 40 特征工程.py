@@ -1,83 +1,39 @@
 #-*- coding: utf-8 -*- 
 
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-
-"""
-########  本文件实现变量处理功能，包括：
-# Part1. 变量转换（常规派生、变换）
-# Part2. 变量标准化、正则化
-# Part3. 变量离散化 （数值型-->类别型）
-# Part4. 数字化     （类别型-->数值型）
-# Part5. 哑变量化   （类别型-->k个哑变量）
-# Part6. 变量合并(PCA, FA)
-# Part7. sklearn.feature_selection包
+########  本文件实现变量处理/特征工程，包括：
+# 变量变换（函数转换、标准化、正则化等）
+# Part1. 变量变换（函数转换）
+#   QuantileTransformer
+#   PowerTransformer
+#   FunctionTransformer
+# Part2. 变量变换（标准化、正则化等）
+#   StandardScaler, Normalization
+#   MinMaXScaler, MaXAbsScaler
+#   RobustScaler
+# Part3. 变量派生
+#   变量提取(比如时间提取)
+#   PolynomialFeatures多项式(N次项,交互项)）
+# 类型转换（离散化、数字化、哑变量化）
+# Part4. 离散化:数值型-->类别型
+#       Binarizer(threshold) 二值离群{0,1}
+#       KBinsDiscretizer(n_bins,encode) 多值离群[0~n_bins)
+#       pd.cut(x, bins, labels) 离散化
+#       pd.qcut()   百分比离群化
+#       K均值离散化
+# Part5. 数字化:类别型-->数值型
+#       OrdinalEncoder 转化成[0,k-1]的值
+#       LabelEncoder 标签编码，同上，只针对单个变量(如目标变量)
+# Part6. 哑变量化:类别型-->哑变量
+#       OneHotEncoder 转化成0-1的多个变量
+#       LabelBinarizer 标签编码，同上，史针对单个变量(如目标变量)
+#       KBinsDiscretizer (数值型-->哑变量)
+# Part7. 变量合并（PCA、FA）
+# Part8. 特征选择（sklearn.feature_selection模块）
 #########################################
-"""
-
-########  关于变量降维：
-# Part1、按变量本身特性来筛选
-# 1）如果变量的缺失比例过大
-# 2）去除方差较小的变量、比例不均衡的变量
-    # 对所有变量中最大比例样本对应的比例大于等于80%的变量予以剔除
-# 3）
-# 二、按自变量与目标变量的相关性来筛选
-# 参考前面的相关分析、方差分析、卡方检验
-
-# 三、
-# 1）SelectKBest():按得分，方差分析F值
-# 2）SelectPercentile():按得分从高到低，选取百分比
-# 3）SelectFpr():按FPR来选择,alpha
-# 4）GenericUnivariateSelect
-# https://www.cnblogs.com/feffery/p/8808398.html
-# https://blog.csdn.net/qq_34840129/article/details/82927156
-# https://www.jianshu.com/p/bd48f67db7c6
-######################################################################
-
-######################################################################
-########  Part1. 去除比例不均衡的变量
-######################################################################
-
-# 1、读取数据集
-filename = 'Telephone.csv'
-dfTel = pd.read_csv(filename, encoding='gbk')
-
-
-# 只取数值型变量
-catCols = ['居住地', '婚姻状况', '教育水平', '性别']
-intCols = ['年龄', '收入','家庭人数','开通月数']
-target = '消费金额'
-
-X = dfTel[intCols]
-
-from sklearn.feature_selection import VarianceThreshold
-
-sel = VarianceThreshold(threshold=0.8*(1-0.2))
-X_ = sel.fit_transform(X)
-print('特征选择后：\n', X_)
-
-from scipy import stats
-
-# 2、选择最恰当的相关系数计算公式
-# 数值型变量的选择函数
-def intFeatureSelection(df, intCols, target, 
-                pthreshold=0.05, rthreshold=0.3):
-    cols = []
-    for col in intCols:
-        r,p = stats.spearmanr(df[col], df[target])
-        print('{}-{}:r={:.2f},p={:.6f}'.format(col, target, r, p))
-        if (p < pthreshold) and (r > rthreshold):
-            cols.append(col)
-    print('对“{}”有影响的变量有：\n{}'.format(target, cols))
-    return cols
-
-cols = intFeatureSelection(dfTel, intCols, target)
 
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-
+# import matplotlib.pyplot as plt
 
 
 filename = 'Telephone.csv'
@@ -85,57 +41,67 @@ df = pd.read_csv(filename, encoding='gbk')
 print(df.columns.tolist())
 
 ######################################################################
-########  Part1.变量转换（常规派生、变换）
+########  Part1. 变量变换（函数转换）
 ######################################################################
-## 变量派生，根据旧变量，生成新的变量
-# 比如基于出生日期，计算年龄
-
-## 变量变换：将原变量进行函数计算，转换成其它值
-X = df['年龄']
-X_ = 1/X
-X_ = np.abs(X) + 2
-X_ = np.log10(X)
-
-# 小数定标标准化，缩放到[-1, 1]范围
-# 变换公式：Decimal scaling y=(X/10的k次方) (k确保maX|y|<1)
-X_ = X/10**np.ceil(np.log10(np.abs(X).maX()))
-
-# 对数Logistic模式 y = 1/(1+e^(-X))
-X_ = 1/(1+np.eXp(-X))
-
 
 #####=======分位数转换QuantileTransformer========================
 # 转换为均匀分布（按照累积概率密度函数），转换后范围为[0,1]
 from sklearn.preprocessing import QuantileTransformer
-trans = QuantileTransformer()
 
+trans = QuantileTransformer()
 cols = ['年龄','收入']
 X_ = trans.fit_transform(df[cols])
 print(X_)
 
 #####=======PowerTransformer============
 # 变换为高斯分布 Gaussian distribution
+# 均值=0，方差/标准差=1
 from sklearn.preprocessing import PowerTransformer
-trans = PowerTransformer(method='yeo-johnson')
 
+trans = PowerTransformer(method='yeo-johnson')
 cols = ['年龄','收入']
 X_ = trans.fit_transform(df[cols])
 print(X_)
+print(X_.mean(axis=0))
+print(X_.std(axis=0))
+
+trans = PowerTransformer(method='box-cox')
+cols = ['年龄','收入']
+X_ = trans.fit_transform(df[cols])
+print(X_)
+print(X_.mean(axis=0))
+print(X_.std(axis=0))
 
 # method取值：
 #    'yeo-johnson'
 #    'box-cox'
 
-
+#####=======PowerTransformer============
 ## 自定义一个函数进行转换
 from sklearn.preprocessing import FunctionTransformer
-trans = FunctionTransformer(np.log10)
 
-X_ = trans.transform(X)
+def myTrans(X):
+
+    #可以自定义函数
+    X_ = np.log10(X) + 2
+
+    # 小数定标标准化，缩放到[-1, 1]范围
+    # 变换公式：Decimal scaling y=(X/10的k次方) (k确保maX|y|<1)
+    # X_ = X/10**np.ceil(np.log10(np.abs(X).max()))
+
+    # 对数Logistic模式 y = 1/(1+e^(-X))
+    # X_ = 1/(1+np.exp(-X))
+
+    return X_
+
+trans = FunctionTransformer(myTrans)
+cols = ['年龄','收入']
+X_ = trans.fit_transform(df[cols])
+print(X_)
 
 
 ######################################################################
-########  Part2.变量规范化
+########  Part2. 标准化、正则化等
 ######################################################################
 
 #####=======StandardScaler============
@@ -146,15 +112,16 @@ X_ = trans.transform(X)
 
 from sklearn.preprocessing import StandardScaler
 
+cols = ['年龄']
 ss = StandardScaler()
-X_ = ss.fit_transform(X)
+X_ = ss.fit_transform(df[cols])
 print(X_)
 
-# # 可以查看其中重要属性
-# ss.n_samples_seen_    #样本数量
-# ss.mean_      #平均值
-# ss.var_       #方差
-# ss.scale_     #缩放比例，即标准差
+# 可以查看其中重要属性
+ss.n_samples_seen_    #样本数量
+ss.mean_      #平均值
+ss.var_       #方差
+ss.scale_     #缩放比例，即标准差
 
 # X_test_scaled = ss.transform(X_test)  #还可以对测试集进行转换
 # X0 = ss.inverse_transform(X_)     #或者还原原始数据
@@ -164,13 +131,13 @@ print(X_)
 #####=======MinMaXScaler============
 from sklearn.preprocessing import MinMaxScaler
 # 数据缩小到指定范围(min, max)，默认(0,1)，保持原有分布形态
-# 变换公式：y=(X-min)/(maX-min)
+# 变换公式：y=(X-min)/(max-min)
 # 作用：对于方差小的变量可以增强其稳定性。
 
 #####=======MaXAbsScaler============
 from sklearn.preprocessing import MaxAbsScaler
 # 数据缩小到[-1, 1]之间的数，保持原有分布形态
-# 变换公式：y = X/abs(maX(X))
+# 变换公式：y = X/abs(max(X))
 # 适合于稀疏数据的处理（包括稀疏的CSR-Compressed Sparse Row行压缩 或CSC-Compressed Sparse Column列压缩矩阵）
 
 #####=======RobustScaler============
@@ -184,20 +151,52 @@ from sklearn.preprocessing import RobustScaler
 # 参数说明:
     # p-范数的计算公式：||X||p=(|X1|^p+|X2|^p+...+|Xn|^p)^1/p，
     # l1,l2范式分别指p=1或p=2的结果
-    # norm：可以为l1、l2或maX，默认为l2
+    # norm：可以为l1、l2或max，默认为l2
     # 若为l1时，旧值除以所有特征值的绝对值之和
     # 若为l2时，旧值除以所有特征值的平方之和的平均根
-    # 若为maX时，旧值除以样本中特征值最大的值
+    # 若为max时，旧值除以样本中特征值最大的值
 
 from sklearn.preprocessing import Normalizer
-# 注意aXis默认为1，所以一定要指定aXis=0
-norm = Normalizer(norm='l1')
-X_ = norm.fit_transform(df[cols])
+# 注意转换的axis默认为1，所以一定要指定axis=0
+norm = Normalizer(norm='l2')
+col = '年龄'
+X_ = norm.fit_transform(df[col].values.reshape(1, -1))
+X_ = X_.reshape(-1, 1)
 print(X_)
 
 
 ######################################################################
-######## Part3. 变量离散化/分箱（数值型-->类别型）
+########  Part3. 变量派生（变量提取、多项式(N次项,交互项)）
+######################################################################
+# 变量派生与变量变换，没有本质区别，最大的区别在于:
+    # 变量变换不生成新的变量，只修改原变量；
+    # 变量派生会生成新的变量
+
+# 派生多项式
+from sklearn.preprocessing import PolynomialFeatures
+
+# cols = ['年龄', '收入']
+# X = df[cols]
+X = np.arange(6).reshape(3, 2)
+
+po = PolynomialFeatures(degree=3)
+X_ = po.fit_transform(X)
+print(X_.shape)
+# 常数项:1
+# 一次项:x1, x2
+# 二次项:x1^2, x1*x2, x2^2
+# 三次项:x1^3, x1^2*x2, x1*x2^2, x2^3
+
+X = np.arange(12).reshape(3, 4)
+po = PolynomialFeatures(degree=3, interaction_only=True, include_bias=False)
+X_ = po.fit_transform(X)
+print(X_.shape)
+# 一次交互项：x1, x2, x3, x4
+# 二次交互项: x1*x2, x1*x3, x1*x4, x2*x3, x2*x4, x3*x4
+# 三次交互项：x1*x2*x3, x1*x2*x4, x1*x3*x4, x2*x3*x4
+
+######################################################################
+######## Part4. 类型转换（离散化、数字化、哑变量化）
 ######################################################################
 
 ### 二值离散化{0，1}
@@ -240,7 +239,7 @@ print(X_)
     # feature 3: [−∞, 14), [14, ∞)
 
 
-# 1、等宽离散化
+# 等宽离散化
 # 注：df['年龄']的取值范围是[18, 47]
 
 #返回每个索引的对应的分段，分成4个段，NaN自成一段
@@ -252,7 +251,7 @@ df['年龄分段'] = sr
 
 print(sr.value_counts())       #返回各分箱的计数
 
-# 2、自定义间隔,可以实现非等距分组。
+# 自定义间隔,可以实现非等距分组。
 # 注：切割区间一般是左开右闭区间，如(0,13],(13,30],(30,50],(50,100]
 # 注意最小值和最大值的设定，不在此范围内的被归属于NaN
 bins = [17, 22, 30, 40, 47]
@@ -264,7 +263,7 @@ sr = pd.cut(df['年龄'], bins, labels=lbls)
 
 # 其余均值-标准差分组，类似为自定义分组实现
 
-# 3、等频离散化（每等分里面的数据量基本一样）
+# 等频离散化（每等分里面的数据量基本一样）
 # 指定组数
 bins = 4        #相当于分成4等分 [0, .25, .5, .75, 1]
 sr = pd.qcut(df['年龄'], bins, labels=lbls)
@@ -280,7 +279,7 @@ sr = pd.qcut(df['年龄'], w, labels=lbls)
 des = df['年龄'].describe(percentiles = w)
 w = des[4:4+bins+1]
 
-# 4、K均值离散化
+# K均值离散化
 
 from sklearn.cluster import KMeans
 col = '年龄'
@@ -330,10 +329,6 @@ sr = pd.cut(df_zs[col], w, labels = range(k)) #分箱
     # New in version 0.20.0.
 
 
-######################################################################
-######## Part4. 数字化（类别型-->数值型）
-######################################################################
-
 ### 类别型-->整数（整数值）
 # 编码成0~k-1的整数
 from sklearn.preprocessing import OrdinalEncoder
@@ -349,8 +344,8 @@ print(enc.categories_)
 from sklearn.preprocessing import LabelEncoder
 enc = LabelEncoder()
 
-cols = ['居住地']
-X_ = enc.fit_transform(df[cols])
+col = '套餐类型'
+X_ = enc.fit_transform(df[col])
 print(X_)
 print(enc.classes_)
 
@@ -366,10 +361,6 @@ print(enc.classes_)
 
 # LabelEncoder
     # 编码成0~k-1的整数 
-
-######################################################################
-######## Part5. 哑变量
-######################################################################
 # 哑变量/二值虚拟变量
 
 # 1、类别-->哑变量
@@ -434,10 +425,15 @@ print('分箱的边界：', est.bin_edges_)
     #       指定 False 则就不用 toarray() 了
     # handle_unknown=’error’，其值可以指定为 "error" 或者 "ignore"，即如果碰到未知的类别，是返回一个错误还是忽略它。
     # 
+######################################################################
+######## Part5. 变量合并（PCA、FA）
+######################################################################
 
 ######################################################################
-########  Part7. 特征选择
+######## Part6. 特征选择（sklearn.feature_selection模块）
 ######################################################################
+
+
 # 选择前N个得分最高的重要的特征
 
 from sklearn.feature_selection import SelectKBest       #选择前K个重要特征
@@ -604,3 +600,62 @@ from sklearn.decomposition import PCA
 # 特征选择
 from sklearn.feature_selection import SelectKBest       #选择前K个重要特征
 from sklearn.feature_selection import SelectPercentile  #选择前百分比个重要特征
+
+
+########  关于变量降维：
+# Part1、按变量本身特性来筛选
+# 1）如果变量的缺失比例过大
+# 2）去除方差较小的变量、比例不均衡的变量
+    # 对所有变量中最大比例样本对应的比例大于等于80%的变量予以剔除
+# 3）
+# 二、按自变量与目标变量的相关性来筛选
+# 参考前面的相关分析、方差分析、卡方检验
+
+# 三、
+# 1）SelectKBest():按得分，方差分析F值
+# 2）SelectPercentile():按得分从高到低，选取百分比
+# 3）SelectFpr():按FPR来选择,alpha
+# 4）GenericUnivariateSelect
+# https://www.cnblogs.com/feffery/p/8808398.html
+# https://blog.csdn.net/qq_34840129/article/details/82927156
+# https://www.jianshu.com/p/bd48f67db7c6
+######################################################################
+
+######################################################################
+########  去除比例不均衡的变量
+######################################################################
+
+# 1、读取数据集
+filename = 'Telephone.csv'
+dfTel = pd.read_csv(filename, encoding='gbk')
+
+
+# 只取数值型变量
+catCols = ['居住地', '婚姻状况', '教育水平', '性别']
+intCols = ['年龄', '收入','家庭人数','开通月数']
+target = '消费金额'
+
+X = dfTel[intCols]
+
+from sklearn.feature_selection import VarianceThreshold
+
+sel = VarianceThreshold(threshold=0.8*(1-0.2))
+X_ = sel.fit_transform(X)
+print('特征选择后：\n', X_)
+
+from scipy import stats
+
+# 2、选择最恰当的相关系数计算公式
+# 数值型变量的选择函数
+def intFeatureSelection(df, intCols, target, 
+                pthreshold=0.05, rthreshold=0.3):
+    cols = []
+    for col in intCols:
+        r,p = stats.spearmanr(df[col], df[target])
+        print('{}-{}:r={:.2f},p={:.6f}'.format(col, target, r, p))
+        if (p < pthreshold) and (r > rthreshold):
+            cols.append(col)
+    print('对“{}”有影响的变量有：\n{}'.format(target, cols))
+    return cols
+
+cols = intFeatureSelection(dfTel, intCols, target)

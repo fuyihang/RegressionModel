@@ -24,7 +24,7 @@ import pandas as pd
 # X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=1)
 # X_train, X_validate, y_train, y_validate = train_test_split(X_train, y_train, test_size=0.2, random_state=1)
 
-
+# 如果使用超参优化，则直接在X_train集中训练和超参优化，顺便将最优模型都得到了
 
 ######################################################################
 ########  Part2、留出法Houd-out，也称简单交叉验证

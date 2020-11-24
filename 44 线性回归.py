@@ -121,14 +121,24 @@ print(pred)
 # 销售额 = a*办公费用 + b*营销费用
 
 # 1、读取数据（同上，略）
-# filename = '回归分析.xlsx'
-# sheet = '销售额'
-# df = pd.read_excel(filename, sheet)
+filename = '回归分析.xlsx'
+sheet = '销售额'
+df = pd.read_excel(filename, sheet)
+# print(df.columns)
 
 # 2、数据预处理
+
+# 1）特征标识
 cols = ['办公费用', '营销费用']
 target = '销售额'
 
+# 2）特征选择
+df2 = df[cols+[target]].corr(method='spearman')
+cond = (df2[target] > 0.3)      #假定阈值为0.3
+cols = df2[cond].index.tolist()
+cols.remove(target)
+
+# 3)构建X, y
 X = df[cols]
 y = df[target]
 
@@ -172,39 +182,68 @@ df = pd.read_excel(filename, sheet_name=sheet)
 # print(df.columns.tolist())
 
 # 2、数据处理
-# 1)选择属性
+# 1)标识属性
 catCols = ['季度']
 intCols = ['GNP','失业率','利率']
 target = '销量'
 
-# 2）如果要预测，则需要错位/移位，并去除首行
-shiftCols = ['GNP','失业率','利率']
-df[shiftCols] = df[shiftCols].shift(periods = 1, axis=0)
-df.drop(0,axis=0,inplace=True)
+# 2）特征选择(协方差分析)
+import statsmodels.formula.api as smf
+import statsmodels.stats.anova as sms
 
-# 3）哑变量转换
+cols = catCols + intCols
+formula = '{} ~ {}'.format(
+        target,
+        '+'.join(cols)
+)
+module = smf.ols(formula, df).fit()
+dfanova = sms.anova_lm(module)
+
+cond = dfanova['PR(>F)'] < 0.05
+cols = dfanova[cond].index.tolist()
+print('显著影响的因素：', cols)
+
+# 去除无显著影响的因素
+for col in catCols:
+    if col not in cols:
+        catCols.remove(col)
+for col in intCols:
+    if col not in cols:
+        intCols.remove(col)
+
+# # 3）如果要预测，则需要错位/移位，并去除首行
+# shiftCols = ['GNP','失业率','利率']
+# df[shiftCols] = df[shiftCols].shift(periods = 1, axis=0)
+# df.drop(0,axis=0,inplace=True)
+
+# 4）哑变量转换
 from sklearn.preprocessing import OneHotEncoder
 
 # 自动找first第一个为默认值
-enc = OneHotEncoder(drop='first',sparse=False)
+enc = OneHotEncoder(drop='first',sparse=False, dtype='int')
 X_ = enc.fit_transform(df[catCols])
-print(X_[:5])
+# print(X_)
 
 # # 可以手工指定默认值(第四季度)，不过太麻烦，不建议
-# cols = (['第四季度', '第一季度','第二季度','第三季度'],)
-# enc = OneHotEncoder(categories=cols, drop='first',sparse=False)
+# labels = (['第四季度', '第一季度','第二季度','第三季度'],)
+# enc = OneHotEncoder(categories=labels, drop='first',sparse=False)
 
 # enc.categories_属性中，只有一个数组
-dfCats = pd.DataFrame(X_, 
-                index=df.index, 
-                columns=enc.categories_[0][1:])
-print(dfCats.head())
+cols = []
+for cats in enc.categories_:
+        cols.extend(cats[1:])
+dfCats = pd.DataFrame(
+        data = X_, 
+        index=df.index, 
+        columns=cols)
+# print(dfCats.head())
 
 # 4）合并连续变量和哑变量
 dfCols = pd.concat([dfCats, df[intCols] ], axis=1)
-print(dfCols.head())
+# print(dfCols.head())
 cols = dfCols.columns.tolist()
 
+# 5)构造X,y
 X = dfCols
 y = df[target]
 
@@ -221,19 +260,20 @@ print(sr)
 y_pred = mdl.predict(X)
 displayRegressionMetrics(y, y_pred, X.shape)
 
-
 # 5、模型优化（略）
 # 6、模型应用
 # 预测87年第一季节的汽车销量
-data = [['第一季度', 4716, 6.9, 7.4]]
-dfx = pd.DataFrame(data=data,columns=catCols+intCols)
-print(dfx)
+X0 = [['第一季度', 4716, 6.9, 7.4]]
+dfX0 = pd.DataFrame(
+        data=X0,
+        columns=catCols+intCols)
+print(dfX0)
 
 # 先哑变量化，再合并
-x_ = enc.transform(dfx[catCols])
+X_ = enc.transform(dfX0[catCols])
 
-x = np.concatenate([x_, dfx[intCols]],axis=1)
-pred = mdl.predict(x)
+X = np.concatenate([X_, dfX0[intCols]],axis=1)
+pred = mdl.predict(X)
 print('预测销量：',pred)
 
 

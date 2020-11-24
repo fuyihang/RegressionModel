@@ -132,7 +132,7 @@ def yhat2(params, X):
     return y
 
 # 参数初始值
-seasons = [1,2,3,4,5,6,7,8,9,10,1,2]
+seasons = [1,2,3,4,5,6,7,8,9,10,11,12]
 params = [30, 1]
 params.extend(seasons)
 
@@ -146,7 +146,8 @@ bnds = [(30,50),(-5,5)]     #base,trend的取值范围
 bnds.extend(sv)
 
 # import scipy.optimize as spo
-optResult = spo.minimize(cost, params, args=(yhat2, X, y), 
+optResult = spo.minimize(cost, params, 
+            args=(yhat2, X, y), 
             method='trust-constr',
             constraints=cons,
             bounds=bnds

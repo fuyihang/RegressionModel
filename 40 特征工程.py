@@ -142,7 +142,7 @@ from sklearn.preprocessing import MaxAbsScaler
 
 #####=======RobustScaler============
 from sklearn.preprocessing import RobustScaler
-# 变换公式：y = (X-median)/IQR
+# 变换公式：y = (X-median)/IQR, 即减去中位数，再除以四分位距, 这样可减轻大异常值的影响。
 # 如果数据有许多异常值，且想保留其离群特征，则可使用RobustScaler
 
 #####=======Normalization============

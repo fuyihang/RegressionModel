@@ -37,11 +37,10 @@ def intFeatureSelection(df, intCols, target, threshold=0.3):
     '''\
         实现数值型变量的特征选择，利用相关系数矩阵
     '''
-    dfcorr = df[intCols+[target]].corr(method='spearman')
+    sr = df[intCols].corrwith(df[target], method='spearman')
 
-    cond = np.abs(dfcorr[target]) > threshold
-    cols = dfcorr[cond].index.tolist()
-    cols.remove(target)
+    cond = np.abs(sr) > threshold
+    cols = sr[cond].index.tolist()
     return cols
 
 # 显示回归评估指标
@@ -140,7 +139,7 @@ class MyFeaturePreprocessing(object):
         self.encCat = OneHotEncoder(drop='first', sparse=False)
         self.encInt = StandardScaler()
 
-    def fit(self, X, y=None):
+    def fit(self, X, y):
         """主要实现如下功能：\n
         1）负责筛选出显著影响的因素
         2）对类别型变量进行哑变量转换
@@ -213,6 +212,7 @@ class MyFeaturePreprocessing(object):
             dfInts = pd.DataFrame(X_, index=df.index,columns=self.intCols)
         else:
             dfInts = df[self.intCols]
+        
         # 3）合并
         dfRet = pd.concat([dfCats, dfInts], axis=1)
         self.cols = dfRet.columns.tolist()

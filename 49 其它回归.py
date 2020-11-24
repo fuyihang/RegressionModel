@@ -8,9 +8,10 @@
 # Part4、决策回归树(CART回归树)
 # Part5、神经网络回归(ANN-MLP)
 # Part6、支持向量回归(SVR)
-
+# Part7、K近邻回归(KNNR)
 ######################################################################
 
+from itertools import starmap
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -464,3 +465,38 @@ vtsNum = mdl.n_support_     # 支持向量的个数
         # 启用详细输出。请注意，此设置利用libsvm中的每进程运行时设置，如果启用，则可能无法在多线程上下文中正常运行。
     # max_iter ： int，optional（默认值= -1）
         # 求解器内迭代的硬限制，或无限制的-1
+
+
+######################################################################
+########  Part7、K近邻回归(KNNR)
+######################################################################
+# K近邻回归,采用距离计算相似性
+# 模型对数值的量纲较敏感，建模前需要作标准化处理
+
+# 1.读数据
+filename = '回归分析.xlsx'
+sheet = '身高年龄与体重'
+df = pd.read_excel(filename, sheet)
+# print(df.columns.tolist())
+
+# 2.数据预处理
+cols = ['身高', '年龄']
+target = '体重'
+
+X = df[cols]
+y = df[target]
+
+from sklearn.preprocessing import StandardScaler
+ss = StandardScaler()
+X = ss.fit_transform(X)
+
+# 3.训练模型
+from sklearn.neighbors import KNeighborsRegressor
+
+K= 5 
+mdl = KNeighborsRegressor(n_neighbors=K)
+mdl.fit(X, y)
+
+# 4.评估模型
+y_pred = mdl.predict(X)
+displayRegressionMetrics(y, y_pred, X.shape)

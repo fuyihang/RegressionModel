@@ -96,7 +96,7 @@ plot_learning_curve(mdl, fit_X, y)
 
 from sklearn.linear_model import Ridge 
 
-alpha = 10.0
+alpha = 100.0
 mdl = Ridge(alpha=alpha) #cholesky
 mdl.fit(fit_X, y)
 
@@ -192,7 +192,6 @@ displayRegressionMetrics(y_pred, y, fit_X.shape)
 # 结合前两者的优点
 
 # 超参优化（参考后面部分）
-
 
 ######################################################################
 ########  Part5、超参优化

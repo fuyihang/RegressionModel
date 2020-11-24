@@ -24,9 +24,6 @@ df = pd.read_excel(filename, sheet_name=sheet)
 cols = ['价格', '广告费用']
 target = '销量'
 
-# 属性选择
-cols = intFeatureSelection(df, cols, target)
-
 X = df[cols]
 y = df[target]
 
